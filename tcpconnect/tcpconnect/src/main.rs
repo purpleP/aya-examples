@@ -1,3 +1,4 @@
+#![feature(cstr_from_bytes_until_nul)]
 use aya::programs::KProbe;
 use aya::{include_bytes_aligned, BpfLoader};
 use aya::{maps::perf::AsyncPerfEventArray, util::online_cpus};
@@ -9,6 +10,8 @@ use std::net::Ipv4Addr;
 use std::ptr;
 use tcpconnect_common::{Filter, TcpInfo};
 use tokio::signal;
+use std::ffi::CStr;
+
 
 #[derive(Debug, Parser)]
 struct Opt {
@@ -19,6 +22,7 @@ struct Opt {
     #[clap(short, long)]
     port: Option<u16>,
 }
+
 
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
@@ -94,10 +98,12 @@ async fn main() -> Result<(), anyhow::Error> {
                 for i in 0..events.read {
                     let buf = &mut buffers[i];
                     let tcp_info = unsafe { ptr::read_unaligned(buf.as_ptr() as *const TcpInfo) };
+                    let command = tcp_info.comm.split(|&ch| ch == 0).next().unwrap();
+                    let command = std::str::from_utf8(command).unwrap();
                     println!(
                         "{:<w$}{:<w$}{:<w$}{:<w$}{:<w$}{:<w$}",
                         tcp_info.pid,
-                        String::from_utf8(tcp_info.comm.into()).unwrap(),
+                        command,
                         Ipv4Addr::from(tcp_info.saddr),
                         tcp_info.lport,
                         Ipv4Addr::from(tcp_info.daddr),
