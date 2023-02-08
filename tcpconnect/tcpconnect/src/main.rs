@@ -1,4 +1,3 @@
-#![feature(cstr_from_bytes_until_nul)]
 use aya::programs::KProbe;
 use aya::{include_bytes_aligned, BpfLoader};
 use aya::{maps::perf::AsyncPerfEventArray, util::online_cpus};
@@ -10,8 +9,6 @@ use std::net::Ipv4Addr;
 use std::ptr;
 use tcpconnect_common::{Filter, TcpInfo};
 use tokio::signal;
-use std::ffi::CStr;
-
 
 #[derive(Debug, Parser)]
 struct Opt {
@@ -22,7 +19,6 @@ struct Opt {
     #[clap(short, long)]
     port: Option<u16>,
 }
-
 
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
@@ -74,16 +70,9 @@ async fn main() -> Result<(), anyhow::Error> {
 
     println!("Waiting for Ctrl-C...");
     println!(
-        "{:<w$}{:<w$}{:<w$}{:<w$}{:<w$}{:<w$}",
-        "PID",
-        "COMM",
-        "SADDR",
-        "LPORT",
-        "DADDR",
-        "DPORT",
-        w = 20
+        "{:<6}{:<16}{:<16}{:<6}{:<16}{:<6}",
+        "PID", "COMM", "SADDR", "LPORT", "DADDR", "DPORT",
     );
-
     let cpus = online_cpus()?;
     let num_cpus = cpus.len();
     let mut events = AsyncPerfEventArray::try_from(bpf.map_mut("DATA")?)?;
@@ -101,14 +90,13 @@ async fn main() -> Result<(), anyhow::Error> {
                     let command = tcp_info.comm.split(|&ch| ch == 0).next().unwrap();
                     let command = std::str::from_utf8(command).unwrap();
                     println!(
-                        "{:<w$}{:<w$}{:<w$}{:<w$}{:<w$}{:<w$}",
+                        "{:<6}{:<16}{:<16}{:<6}{:<16}{:<6}",
                         tcp_info.pid,
                         command,
                         Ipv4Addr::from(tcp_info.saddr),
                         tcp_info.lport,
                         Ipv4Addr::from(tcp_info.daddr),
                         tcp_info.dport,
-                        w = 20,
                     );
                 }
             }
